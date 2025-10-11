@@ -11,10 +11,31 @@ This guide explains how to test GitHub Actions workflows locally using [act](htt
 
 ## Installation
 
-### Linux
+### Linux (Recommended for this project)
+
+The install script creates a local `bin/act` in your current directory:
 
 ```bash
-# Download and install
+# Download and install to ./bin/act
+curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | bash
+
+# Run from project directory
+./bin/act
+
+# Or add to PATH for this session
+export PATH="$PWD/bin:$PATH"
+act
+
+# Or install globally (requires sudo)
+sudo mv bin/act /usr/local/bin/
+```
+
+**Note**: The `bin/` directory is already in `.gitignore`, so the local act binary won't be committed.
+
+### Alternative: System-wide Installation
+
+```bash
+# Install globally with sudo
 curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
 
 # Or using package managers
@@ -46,40 +67,42 @@ scoop install act
 
 ## Quick Start
 
+**Note**: If you installed locally, use `./bin/act` instead of just `act` in all commands below (or add `bin/` to your PATH).
+
 ### 1. Run All Workflows
 
 ```bash
 # Test the default event (push)
-act
+./bin/act
 
 # Test pull request event
-act pull_request
+./bin/act pull_request
 
 # Test specific workflow
-act -W .github/workflows/ci.yml
+./bin/act -W .github/workflows/ci.yml
 ```
 
 ### 2. Run Specific Job
 
 ```bash
-# Run only the lint-and-test job
-act -j lint-and-test
+# Run only the build-and-test job
+./bin/act -j build-and-test
 
-# Run with specific Go version
-act -j lint-and-test --matrix go-version:1.24
+# List available jobs
+./bin/act -l
 ```
 
 ### 3. Debug Mode
 
 ```bash
 # Verbose output
-act -v
+./bin/act -v
 
 # Very verbose (includes Docker commands)
-act -vv
+./bin/act -vv
 
 # List available workflows/jobs without running
-act -l
+./bin/act -l
 ```
 
 ## Common Commands for This Project
@@ -87,14 +110,14 @@ act -l
 ### Test CI Workflow
 
 ```bash
-# Run the full CI workflow
-act push -W .github/workflows/ci.yml
+# Run the full CI workflow (recommended before pushing)
+./bin/act push -W .github/workflows/ci.yml
 
-# Run with specific Go version matrix
-act push -W .github/workflows/ci.yml --matrix go-version:1.22
+# Or just run the default push event
+./bin/act push
 
-# Run only linting
-act push -W .github/workflows/ci.yml -j lint-and-test
+# Run only the build-and-test job
+./bin/act -j build-and-test
 ```
 
 ### Test Release Workflow
@@ -201,8 +224,8 @@ act --dryrun -W .github/workflows/ci.yml
 
 ## Best Practices
 
-1. **Test before pushing**: Always run `act` before `git push`
-2. **Use .actrc**: Set up defaults to avoid repetitive flags
+1. **Test before pushing**: Always run `./bin/act` before `git push`
+2. **Use .actrc**: Set up defaults to avoid repetitive flags (place in project root)
 3. **Keep secrets safe**: Never commit `.secrets` file
 4. **Use medium container**: Good balance of size vs. functionality
 5. **Check the logs**: Use `-v` for detailed output when debugging
@@ -216,13 +239,28 @@ vim server.go
 # 2. Run tests locally
 go test ./...
 
-# 3. Test CI with act
-act push -W .github/workflows/ci.yml
+# 3. Test CI with act (catches linting issues locally!)
+./bin/act push
 
 # 4. If successful, commit and push
 git add .
 git commit -m "feat: add new feature"
 git push origin main
+```
+
+## Adding act to Your PATH (Optional)
+
+To avoid typing `./bin/act` every time:
+
+```bash
+# Add to your ~/.zshrc or ~/.bashrc
+export PATH="$HOME/code/mcps/hyper-mcp/bin:$PATH"
+
+# Or create an alias
+alias act="$HOME/code/mcps/hyper-mcp/bin/act"
+
+# Or move to system location
+sudo mv bin/act /usr/local/bin/
 ```
 
 ## Resources
@@ -234,4 +272,4 @@ git push origin main
 
 ---
 
-**Pro Tip**: Add `act` to your pre-push Git hook to automatically test workflows before pushing!
+**Pro Tip**: The `bin/` directory is already in `.gitignore`, so your local act installation won't be committed to the repo!
