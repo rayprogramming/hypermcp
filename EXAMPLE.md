@@ -89,9 +89,9 @@ type EchoOutput struct {
 
 // registerTools registers all tools with the MCP server
 func registerTools(srv *hypermcp.Server, logger *zap.Logger) {
-	// Register a simple echo tool
-	mcp.AddTool(
-		srv.MCP(),
+	// Register a simple echo tool using the helper function
+	hypermcp.AddTool(
+		srv,
 		&mcp.Tool{
 			Name:        "echo",
 			Description: "Echo back a message",
@@ -101,11 +101,10 @@ func registerTools(srv *hypermcp.Server, logger *zap.Logger) {
 			return nil, EchoOutput{Echo: input.Message}, nil
 		},
 	)
-	srv.IncrementToolCount()
 
 	// Add more tools here...
 }
-\`\`\`
+```
 
 ## Build and Run
 

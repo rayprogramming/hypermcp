@@ -123,6 +123,24 @@ func (s *Server) Run(ctx context.Context, transport mcp.Transport) error {
 	return s.mcp.Run(ctx, transport)
 }
 
+// AddTool registers a tool with the MCP server and increments the tool counter
+func AddTool[In, Out any](s *Server, tool *mcp.Tool, handler mcp.ToolHandlerFor[In, Out]) {
+	mcp.AddTool(s.mcp, tool, handler)
+	s.IncrementToolCount()
+}
+
+// AddResource registers a resource with the MCP server and increments the resource counter
+func (s *Server) AddResource(resource *mcp.Resource, handler mcp.ResourceHandler) {
+	s.mcp.AddResource(resource, handler)
+	s.IncrementResourceCount()
+}
+
+// AddResourceTemplate registers a resource template with the MCP server and increments the resource counter
+func (s *Server) AddResourceTemplate(template *mcp.ResourceTemplate, handler mcp.ResourceHandler) {
+	s.mcp.AddResourceTemplate(template, handler)
+	s.IncrementResourceCount()
+}
+
 // Shutdown performs cleanup
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.logger.Info("shutting down server")

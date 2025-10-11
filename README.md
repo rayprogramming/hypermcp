@@ -110,8 +110,9 @@ func registerFeatures(srv *hypermcp.Server) {
     // Create providers
     myProvider := providers.NewMyProvider(srv)
 
-    // Register tools
-    srv.AddTool(
+    // Register tools using the helper function
+    hypermcp.AddTool(
+        srv,
         &mcp.Tool{
             Name:        "my_tool",
             Description: "Does something cool",
@@ -119,7 +120,7 @@ func registerFeatures(srv *hypermcp.Server) {
         myProvider.MyTool,
     )
 
-    // Register resources
+    // Register resources using the helper method
     srv.AddResource(
         &mcp.Resource{
             URI:         "myresource://data",
@@ -161,12 +162,17 @@ type Config struct {
 - `Cache() *cache.Cache` - Get the cache instance
 - `Logger() *zap.Logger` - Get the logger
 - `MCP() *mcp.Server` - Get the underlying MCP server
-- `AddTool(tool, handler)` - Register a tool
-- `AddResource(resource, handler)` - Register a resource
-- `AddResourceTemplate(template, handler)` - Register a resource template
+- `AddResource(resource, handler)` - Register a resource (auto-increments counter)
+- `AddResourceTemplate(template, handler)` - Register a resource template (auto-increments counter)
 - `LogRegistrationStats()` - Log tool/resource counts
 - `Run(ctx, transport)` - Start the server
 - `Shutdown(ctx)` - Gracefully shutdown
+
+### Package-Level Functions
+
+- `AddTool[In, Out](srv, tool, handler)` - Register a tool (auto-increments counter)
+- `New(cfg, logger)` - Create a new server instance
+- `RunWithTransport(ctx, srv, transportType, logger)` - Start server with specified transport
 
 ### Transport
 

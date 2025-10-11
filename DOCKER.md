@@ -1,6 +1,6 @@
-# Docker Deployment Guide for MCPBase Servers
+# Docker Deployment Guide for hypermcp Servers
 
-This guide covers containerizing and deploying MCP servers built with MCPBase.
+This guide covers containerizing and deploying MCP servers built with hypermcp.
 
 ## 📋 Table of Contents
 - [Quick Start](#quick-start)
@@ -15,7 +15,7 @@ This guide covers containerizing and deploying MCP servers built with MCPBase.
 
 ### 1. Copy the Example Dockerfile
 ```bash
-cp pkg/mcpbase/Dockerfile.example ./Dockerfile
+cp Dockerfile.example ./Dockerfile
 ```
 
 ### 2. Build Your Image
@@ -357,4 +357,4 @@ docker run --rm -it --entrypoint /bin/sh my-mcp-server:latest
 
 ---
 
-**Need help?** Check the main MCPBase documentation or open an issue!
+**Need help?** Check the main hypermcp documentation or open an issue!
