@@ -12,9 +12,9 @@ import (
 func TestConfig_Validate(t *testing.T) {
 	tests := []struct {
 		name    string
+		errMsg  string
 		config  Config
 		wantErr bool
-		errMsg  string
 	}{
 		{
 			name: "valid config",
@@ -77,8 +77,8 @@ func TestNew_ValidationError(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		config  Config
 		wantErr string
+		config  Config
 	}{
 		{
 			name: "empty name",

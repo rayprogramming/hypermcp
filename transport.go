@@ -47,16 +47,10 @@ const (
 	TransportStreamableHTTP TransportType = "streamable-http"
 )
 
-// RunWithTransport starts the server with the specified transport type.
+// RunWithTransport starts the MCP server with the specified transport.
 //
-// For most use cases, use TransportStdio (the default and recommended transport).
-// TransportStreamableHTTP is for advanced scenarios requiring multiple concurrent clients,
-// but is not yet implemented.
-//
-// The function logs the selected transport and blocks until the context is cancelled
-// or an error occurs.
-//
-// Returns an error if the transport type is unknown or not yet implemented.
+// The function logs the selected transport and blocks until the context is canceled
+// or an error occurs. Currently only stdio transport is implemented.
 func RunWithTransport(ctx context.Context, srv *Server, transportType TransportType, logger *zap.Logger) error {
 	var transport mcp.Transport
 

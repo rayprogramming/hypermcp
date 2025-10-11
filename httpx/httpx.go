@@ -79,7 +79,11 @@ func (c *Client) DoJSON(ctx context.Context, req *http.Request, result interface
 			)
 			return err
 		}
-		defer resp.Body.Close()
+		defer func() {
+			if closeErr := resp.Body.Close(); closeErr != nil {
+				c.logger.Warn("failed to close response body", zap.Error(closeErr))
+			}
+		}()
 
 		// Limit response size to prevent memory exhaustion
 		limitedReader := io.LimitReader(resp.Body, maxResponseSize)
@@ -102,8 +106,8 @@ func (c *Client) DoJSON(ctx context.Context, req *http.Request, result interface
 
 		// Decode JSON response
 		decoder := json.NewDecoder(limitedReader)
-		if err := decoder.Decode(result); err != nil {
-			return backoff.Permanent(fmt.Errorf("json decode error: %w", err))
+		if decodeErr := decoder.Decode(result); decodeErr != nil {
+			return backoff.Permanent(fmt.Errorf("json decode error: %w", decodeErr))
 		}
 
 		return nil

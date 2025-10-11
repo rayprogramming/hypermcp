@@ -184,7 +184,7 @@ func (s *Server) LogRegistrationStats() {
 
 // Run starts the server with the given transport.
 //
-// This method blocks until the context is cancelled or an error occurs.
+// This method blocks until the context is canceled or an error occurs.
 // Most users should use RunWithTransport instead of calling this directly.
 func (s *Server) Run(ctx context.Context, transport mcp.Transport) error {
 	s.logger.Info("starting mcp server")
@@ -288,7 +288,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	case <-done:
 		return nil
 	case <-ctx.Done():
-		s.logger.Warn("shutdown cancelled or timed out", zap.Error(ctx.Err()))
+		s.logger.Warn("shutdown canceled or timed out", zap.Error(ctx.Err()))
 		return ctx.Err()
 	}
 }

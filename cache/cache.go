@@ -10,10 +10,10 @@ import (
 
 // Cache provides a high-performance in-memory cache
 type Cache struct {
-	store  *ristretto.Cache[string, any]
-	logger *zap.Logger
 	mu     sync.RWMutex
 	ttls   map[string]time.Time
+	store  *ristretto.Cache[string, any]
+	logger *zap.Logger
 }
 
 // Config holds cache configuration
