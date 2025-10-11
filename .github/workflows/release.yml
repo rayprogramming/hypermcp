@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GO_VERSION: '1.22.x'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+          cache: true
+      - name: Verify modules
+        run: |
+          go mod download
+          go mod verify
+      - name: Lint (go vet)
+        run: |
+          go vet ./...
+      - name: Lint (golangci-lint)
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.60.3
+          args: --timeout=3m
+      - name: Run tests
+        run: |
+          go test ./... -race -coverprofile=coverage.out -covermode=atomic
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+
+  build:
+    name: Build artifacts
+    runs-on: ubuntu-latest
+    needs: validate
+    env:
+      GO_VERSION: '1.22.x'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+          cache: true
+      - name: Build (Linux amd64)
+        env:
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          go build -v ./...
+      - name: Archive source
+        run: |
+          git archive --format tar.gz -o source.tar.gz HEAD
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            source.tar.gz
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: .
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            source.tar.gz
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

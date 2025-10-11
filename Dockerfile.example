@@ -1,0 +1,79 @@
+# Example Dockerfile for hypermcp-based MCP Servers
+# 
+# This is a multi-stage build that:
+# 1. Builds your Go binary in a build stage
+# 2. Creates a minimal runtime image with just the binary
+# 3. Runs as non-root user for security
+#
+# Usage:
+#   docker build -f Dockerfile.example -t my-mcp-server:latest .
+#   docker run -i my-mcp-server:latest
+#
+# For MCP servers using stdio transport (most common):
+#   The server reads from stdin and writes to stdout, so you MUST use -i flag
+#
+# Environment variables you can set:
+#   LOG_LEVEL=debug|info|warn|error (default: info)
+#   TRANSPORT=stdio|streamable-http (default: stdio)
+
+# Stage 1: Build
+FROM golang:1.21-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates tzdata
+
+# Set working directory
+WORKDIR /build
+
+# Copy go mod files first (better layer caching)
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the binary
+# - CGO_ENABLED=0 for static binary
+# - -ldflags="-w -s" to strip debug info and reduce size
+# - -trimpath to remove file system paths from binary
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_TIME=unknown
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME}" \
+    -trimpath \
+    -o /build/mcp-server \
+    ./cmd/server
+
+# Stage 2: Runtime
+FROM scratch
+
+# Copy timezone data and CA certificates from builder
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+# Copy the binary
+COPY --from=builder /build/mcp-server /mcp-server
+
+# Create non-root user (using numeric UID for scratch image)
+# Note: In scratch, we can't create users, so we just set USER
+USER 65534:65534
+
+# Set environment variables
+ENV LOG_LEVEL=info
+ENV TRANSPORT=stdio
+
+# Health check (if you add an HTTP health endpoint)
+# HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+#   CMD ["/mcp-server", "-health"]
+
+# MCP servers using stdio don't expose ports
+# If you add Streamable HTTP transport, uncomment:
+# EXPOSE 8080
+
+# Entry point
+ENTRYPOINT ["/mcp-server"]
+
+# Default command (can be overridden)
+CMD ["-transport", "stdio"]
