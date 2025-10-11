@@ -295,20 +295,70 @@ func TestServer_LogRegistrationStats(t *testing.T) {
 
 func TestServer_Shutdown(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	cfg := Config{
-		Name:         "test-server",
-		Version:      "1.0.0",
-		CacheEnabled: false,
+
+	tests := []struct {
+		name         string
+		cacheEnabled bool
+		withTimeout  bool
+		wantErr      bool
+	}{
+		{
+			name:         "successful shutdown without cache",
+			cacheEnabled: false,
+			withTimeout:  false,
+			wantErr:      false,
+		},
+		{
+			name:         "successful shutdown with cache",
+			cacheEnabled: true,
+			withTimeout:  false,
+			wantErr:      false,
+		},
+		{
+			name:         "shutdown with timeout",
+			cacheEnabled: true,
+			withTimeout:  true,
+			wantErr:      true,
+		},
 	}
 
-	srv, err := New(cfg, logger)
-	if err != nil {
-		t.Fatalf("failed to create server: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{
+				Name:         "test-server",
+				Version:      "1.0.0",
+				CacheEnabled: tt.cacheEnabled,
+			}
 
-	ctx := context.Background()
-	if err := srv.Shutdown(ctx); err != nil {
-		t.Errorf("shutdown failed: %v", err)
+			if tt.cacheEnabled {
+				cfg.CacheConfig = cache.Config{
+					MaxCost:     1024 * 1024, // 1MB
+					NumCounters: 1000,
+					BufferItems: 64,
+				}
+			}
+
+			srv, err := New(cfg, logger)
+			if err != nil {
+				t.Fatalf("failed to create server: %v", err)
+			}
+
+			var ctx context.Context
+			var cancel context.CancelFunc
+
+			if tt.withTimeout {
+				// Create a context that's already cancelled to simulate timeout
+				ctx, cancel = context.WithCancel(context.Background())
+				cancel()
+			} else {
+				ctx = context.Background()
+			}
+
+			err = srv.Shutdown(ctx)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Shutdown() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
 
