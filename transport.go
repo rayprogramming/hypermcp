@@ -29,20 +29,34 @@ import (
 // Note: The old HTTP+SSE transport is deprecated but servers can maintain backwards
 // compatibility by supporting both old and new transports.
 
-// TransportType defines the type of transport to use
+// TransportType defines the type of transport to use.
+//
+// The MCP specification defines two standard transports: stdio and Streamable HTTP.
 type TransportType string
 
 const (
-	// TransportStdio uses standard input/output (recommended for most use cases)
+	// TransportStdio uses standard input/output for communication.
+	// This is the recommended transport for most MCP servers where the client
+	// launches the server as a subprocess.
 	TransportStdio TransportType = "stdio"
-	// TransportStreamableHTTP uses Streamable HTTP (for servers handling multiple client connections)
+
+	// TransportStreamableHTTP uses HTTP-based transport for multiple client connections.
+	// This replaces the deprecated HTTP+SSE transport and is suitable for servers
+	// that need to handle multiple concurrent clients.
+	// Note: Not yet implemented in this library.
 	TransportStreamableHTTP TransportType = "streamable-http"
 )
 
-// RunWithTransport starts the server with the specified transport type
+// RunWithTransport starts the server with the specified transport type.
 //
 // For most use cases, use TransportStdio (the default and recommended transport).
-// TransportStreamableHTTP is for advanced scenarios requiring multiple concurrent clients.
+// TransportStreamableHTTP is for advanced scenarios requiring multiple concurrent clients,
+// but is not yet implemented.
+//
+// The function logs the selected transport and blocks until the context is cancelled
+// or an error occurs.
+//
+// Returns an error if the transport type is unknown or not yet implemented.
 func RunWithTransport(ctx context.Context, srv *Server, transportType TransportType, logger *zap.Logger) error {
 	var transport mcp.Transport
 

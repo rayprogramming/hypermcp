@@ -1,4 +1,23 @@
-// Package hypermcp provides reusable MCP server infrastructure
+// Package hypermcp provides reusable MCP server infrastructure.
+//
+// This package simplifies building Model Context Protocol (MCP) servers by providing
+// common infrastructure components including HTTP client with retry logic, caching,
+// structured logging, and transport abstraction.
+//
+// Example usage:
+//
+//	cfg := hypermcp.Config{
+//	    Name:         "my-server",
+//	    Version:      "1.0.0",
+//	    CacheEnabled: true,
+//	}
+//	srv, err := hypermcp.New(cfg, logger)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	hypermcp.AddTool(srv, tool, handler)
+//	srv.AddResource(resource, handler)
+//	hypermcp.RunWithTransport(ctx, srv, hypermcp.TransportStdio, logger)
 package hypermcp
 
 import (
@@ -11,7 +30,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// Server wraps the MCP server with common infrastructure
+// Server wraps the MCP server with common infrastructure.
+//
+// It provides access to shared resources like HTTP client, cache, and logger,
+// along with helper methods for registering tools and resources with automatic
+// counter tracking.
 type Server struct {
 	mcp        *mcp.Server
 	httpClient *httpx.Client
@@ -24,7 +47,10 @@ type Server struct {
 	resourceCount int
 }
 
-// Config holds server configuration
+// Config holds server configuration.
+//
+// Name and Version are required fields and will be validated.
+// CacheEnabled determines whether to initialize a full cache instance.
 type Config struct {
 	Name         string
 	Version      string
@@ -32,7 +58,9 @@ type Config struct {
 	CacheConfig  cache.Config
 }
 
-// Validate checks if the configuration is valid
+// Validate checks if the configuration is valid.
+//
+// Returns an error if Name or Version is empty.
 func (c Config) Validate() error {
 	if c.Name == "" {
 		return fmt.Errorf("server name cannot be empty")
@@ -43,7 +71,13 @@ func (c Config) Validate() error {
 	return nil
 }
 
-// New creates a new MCP server with common infrastructure
+// New creates a new MCP server with common infrastructure.
+//
+// It initializes the HTTP client with retry logic, creates a cache instance
+// (if enabled), and sets up the underlying MCP server. The configuration is
+// validated before creating the server.
+//
+// Returns an error if the configuration is invalid or if cache creation fails.
 func New(cfg Config, logger *zap.Logger) (*Server, error) {
 	// Validate configuration
 	if err := cfg.Validate(); err != nil {
@@ -94,37 +128,53 @@ func New(cfg Config, logger *zap.Logger) (*Server, error) {
 	return s, nil
 }
 
-// HTTPClient returns the shared HTTP client
+// HTTPClient returns the shared HTTP client.
+//
+// The client includes retry logic, proper timeouts, and is safe for concurrent use.
 func (s *Server) HTTPClient() *httpx.Client {
 	return s.httpClient
 }
 
-// Cache returns the cache instance
+// Cache returns the cache instance.
+//
+// Even when CacheEnabled is false, a minimal cache instance is returned.
 func (s *Server) Cache() *cache.Cache {
 	return s.cache
 }
 
-// Logger returns the logger instance
+// Logger returns the logger instance.
+//
+// This is the same logger passed to New() during server creation.
 func (s *Server) Logger() *zap.Logger {
 	return s.logger
 }
 
-// MCP returns the underlying MCP server for direct access if needed
+// MCP returns the underlying MCP server for direct access if needed.
+//
+// Most users should prefer using the helper methods (AddTool, AddResource, etc.)
+// rather than accessing the MCP server directly.
 func (s *Server) MCP() *mcp.Server {
 	return s.mcp
 }
 
-// IncrementToolCount increments the tool counter (call after AddTool)
+// IncrementToolCount increments the tool counter.
+//
+// This is called automatically by AddTool, so you typically don't need to call it manually.
 func (s *Server) IncrementToolCount() {
 	s.toolCount++
 }
 
-// IncrementResourceCount increments the resource counter (call after AddResource/AddResourceTemplate)
+// IncrementResourceCount increments the resource counter.
+//
+// This is called automatically by AddResource and AddResourceTemplate,
+// so you typically don't need to call it manually.
 func (s *Server) IncrementResourceCount() {
 	s.resourceCount++
 }
 
-// LogRegistrationStats logs the number of registered tools and resources
+// LogRegistrationStats logs the number of registered tools and resources.
+//
+// This is useful for debugging and verifying that all expected features were registered.
 func (s *Server) LogRegistrationStats() {
 	s.logger.Info("registered tools and resources",
 		zap.Int("tools", s.toolCount),
@@ -132,31 +182,76 @@ func (s *Server) LogRegistrationStats() {
 	)
 }
 
-// Run starts the server with the given transport
+// Run starts the server with the given transport.
+//
+// This method blocks until the context is cancelled or an error occurs.
+// Most users should use RunWithTransport instead of calling this directly.
 func (s *Server) Run(ctx context.Context, transport mcp.Transport) error {
 	s.logger.Info("starting mcp server")
 	return s.mcp.Run(ctx, transport)
 }
 
-// AddTool registers a tool with the MCP server and increments the tool counter
+// AddTool registers a tool with the MCP server and automatically increments the tool counter.
+//
+// This is a generic function that provides type-safe tool registration. The input and output
+// types are inferred from the handler function signature. If the tool's input or output schema
+// is nil, it will be automatically generated from the type parameters.
+//
+// Example:
+//
+//	type Input struct {
+//	    Message string `json:"message"`
+//	}
+//	type Output struct {
+//	    Result string `json:"result"`
+//	}
+//	hypermcp.AddTool(srv, &mcp.Tool{Name: "echo"}, func(ctx context.Context, req *mcp.CallToolRequest, input Input) (*mcp.CallToolResult, Output, error) {
+//	    return nil, Output{Result: input.Message}, nil
+//	})
 func AddTool[In, Out any](s *Server, tool *mcp.Tool, handler mcp.ToolHandlerFor[In, Out]) {
 	mcp.AddTool(s.mcp, tool, handler)
 	s.IncrementToolCount()
 }
 
-// AddResource registers a resource with the MCP server and increments the resource counter
+// AddResource registers a resource with the MCP server and automatically increments the resource counter.
+//
+// Resources provide static or dynamic content that can be read by MCP clients.
+//
+// Example:
+//
+//	srv.AddResource(&mcp.Resource{
+//	    URI: "myapp://data",
+//	    Name: "Application Data",
+//	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+//	    return &mcp.ReadResourceResult{...}, nil
+//	})
 func (s *Server) AddResource(resource *mcp.Resource, handler mcp.ResourceHandler) {
 	s.mcp.AddResource(resource, handler)
 	s.IncrementResourceCount()
 }
 
-// AddResourceTemplate registers a resource template with the MCP server and increments the resource counter
+// AddResourceTemplate registers a resource template with the MCP server and automatically
+// increments the resource counter.
+//
+// Resource templates allow parameterized URIs using URI template syntax (RFC 6570).
+//
+// Example:
+//
+//	srv.AddResourceTemplate(&mcp.ResourceTemplate{
+//	    URITemplate: "myapp://users/{userId}",
+//	    Name: "User Data",
+//	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+//	    userId := req.Params.URI // Extract from actual request
+//	    return &mcp.ReadResourceResult{...}, nil
+//	})
 func (s *Server) AddResourceTemplate(template *mcp.ResourceTemplate, handler mcp.ResourceHandler) {
 	s.mcp.AddResourceTemplate(template, handler)
 	s.IncrementResourceCount()
 }
 
-// Shutdown performs cleanup
+// Shutdown performs cleanup and gracefully shuts down the server.
+//
+// Currently this is a placeholder for future cleanup logic.
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.logger.Info("shutting down server")
 	// Add any cleanup logic here
