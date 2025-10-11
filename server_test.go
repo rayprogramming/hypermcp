@@ -338,26 +338,26 @@ func TestServer_Shutdown(t *testing.T) {
 				}
 			}
 
-			srv, err := New(cfg, logger)
-			if err != nil {
-				t.Fatalf("failed to create server: %v", err)
-			}
+		srv, err := New(cfg, logger)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
 
-			var ctx context.Context
-			var cancel context.CancelFunc
+		var ctx context.Context
+		var cancel context.CancelFunc
 
-			if tt.withTimeout {
-				// Create a context that's already cancelled to simulate timeout
-				ctx, cancel = context.WithCancel(context.Background())
-				cancel()
-			} else {
-				ctx = context.Background()
-			}
+		if tt.withTimeout {
+			// Create a context that's already canceled to simulate timeout
+			ctx, cancel = context.WithCancel(context.Background())
+			cancel()
+		} else {
+			ctx = context.Background()
+		}
 
-			err = srv.Shutdown(ctx)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Shutdown() error = %v, wantErr %v", err, tt.wantErr)
-			}
+		err = srv.Shutdown(ctx)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("Shutdown() error = %v, wantErr %v", err, tt.wantErr)
+		}
 		})
 	}
 }
