@@ -16,7 +16,9 @@ func TestClient_DoJSON_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		response := map[string]string{"message": "success"}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}))
 	defer server.Close()
 
@@ -44,7 +46,9 @@ func TestClient_DoJSON_Retry(t *testing.T) {
 			return
 		}
 		response := map[string]string{"message": "success"}
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}))
 	defer server.Close()
 
@@ -66,7 +70,9 @@ func TestClient_DoJSON_Retry(t *testing.T) {
 func TestClient_DoJSON_ContextCancellation(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(200 * time.Millisecond)
-		json.NewEncoder(w).Encode(map[string]string{"message": "success"})
+		if err := json.NewEncoder(w).Encode(map[string]string{"message": "success"}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}))
 	defer server.Close()
 
@@ -91,7 +97,9 @@ func BenchmarkClient_DoJSON(b *testing.B) {
 			"extract": "This is a test extract with some content.",
 			"url":     "https://example.com",
 		}
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}))
 	defer server.Close()
 
