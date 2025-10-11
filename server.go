@@ -32,8 +32,23 @@ type Config struct {
 	CacheConfig  cache.Config
 }
 
+// Validate checks if the configuration is valid
+func (c Config) Validate() error {
+	if c.Name == "" {
+		return fmt.Errorf("server name cannot be empty")
+	}
+	if c.Version == "" {
+		return fmt.Errorf("server version cannot be empty")
+	}
+	return nil
+}
+
 // New creates a new MCP server with common infrastructure
 func New(cfg Config, logger *zap.Logger) (*Server, error) {
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
 	// Create shared HTTP client
 	httpClient := httpx.New(logger)
 

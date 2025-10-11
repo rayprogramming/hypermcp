@@ -9,6 +9,108 @@ import (
 	"go.uber.org/zap/zaptest"
 )
 
+func TestConfig_Validate(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "valid config",
+			config: Config{
+				Name:         "test-server",
+				Version:      "1.0.0",
+				CacheEnabled: true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty name",
+			config: Config{
+				Name:    "",
+				Version: "1.0.0",
+			},
+			wantErr: true,
+			errMsg:  "server name cannot be empty",
+		},
+		{
+			name: "empty version",
+			config: Config{
+				Name:    "test-server",
+				Version: "",
+			},
+			wantErr: true,
+			errMsg:  "server version cannot be empty",
+		},
+		{
+			name: "both empty",
+			config: Config{
+				Name:    "",
+				Version: "",
+			},
+			wantErr: true,
+			errMsg:  "server name cannot be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error but got nil")
+				} else if err.Error() != tt.errMsg {
+					t.Errorf("expected error %q, got %q", tt.errMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestNew_ValidationError(t *testing.T) {
+	logger := zaptest.NewLogger(t)
+
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr string
+	}{
+		{
+			name: "empty name",
+			config: Config{
+				Name:    "",
+				Version: "1.0.0",
+			},
+			wantErr: "invalid config: server name cannot be empty",
+		},
+		{
+			name: "empty version",
+			config: Config{
+				Name:    "test-server",
+				Version: "",
+			},
+			wantErr: "invalid config: server version cannot be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := New(tt.config, logger)
+			if err == nil {
+				t.Fatal("expected error but got nil")
+			}
+			if err.Error() != tt.wantErr {
+				t.Errorf("expected error %q, got %q", tt.wantErr, err.Error())
+			}
+		})
+	}
+}
+
 func TestNew(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 
