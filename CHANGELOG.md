@@ -1,3 +1,10 @@
+# [0.3.0](https://github.com/rayprogramming/hypermcp/compare/v0.2.0...v0.3.0) (2025-10-12)
+
+
+### Features
+
+* add metrics and observability ([7c5ad72](https://github.com/rayprogramming/hypermcp/commit/7c5ad7260861ed10285080e20a8a7a0f38b89f2a))
+
 # [0.2.0](https://github.com/rayprogramming/hypermcp/compare/v0.1.2...v0.2.0) (2025-10-12)
 
 
