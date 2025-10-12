@@ -123,14 +123,14 @@ func main() {
 	go func() {
 		<-sigChan
 		logger.Info("shutting down...")
-		
+
 		// Log metrics
 		metrics := srv.GetMetrics()
 		logger.Info("final metrics",
 			zap.Duration("uptime", metrics.Uptime),
 			zap.Int64("resource_reads", metrics.ResourceReads),
 		)
-		
+
 		cancel()
 	}()
 

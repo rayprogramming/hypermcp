@@ -14,13 +14,13 @@ type Metrics struct {
 	startTime time.Time
 
 	// Tool and resource usage
-	toolInvocations     atomic.Int64
-	resourceReads       atomic.Int64
-	
+	toolInvocations atomic.Int64
+	resourceReads   atomic.Int64
+
 	// Cache statistics
 	cacheHits   atomic.Int64
 	cacheMisses atomic.Int64
-	
+
 	// Error tracking
 	errors atomic.Int64
 }
@@ -32,16 +32,16 @@ type Metrics struct {
 type MetricsSnapshot struct {
 	// Server uptime
 	Uptime time.Duration
-	
+
 	// Tool and resource usage
 	ToolInvocations int64
 	ResourceReads   int64
-	
+
 	// Cache statistics
-	CacheHits     int64
-	CacheMisses   int64
-	CacheHitRate  float64 // Calculated as hits / (hits + misses)
-	
+	CacheHits    int64
+	CacheMisses  int64
+	CacheHitRate float64 // Calculated as hits / (hits + misses)
+
 	// Error tracking
 	Errors int64
 }
@@ -82,21 +82,21 @@ func (m *Metrics) IncrementErrors() {
 func (m *Metrics) Snapshot() MetricsSnapshot {
 	hits := m.cacheHits.Load()
 	misses := m.cacheMisses.Load()
-	
+
 	var hitRate float64
 	totalCacheAccess := hits + misses
 	if totalCacheAccess > 0 {
 		hitRate = float64(hits) / float64(totalCacheAccess)
 	}
-	
+
 	return MetricsSnapshot{
-		Uptime:            time.Since(m.startTime),
-		ToolInvocations:   m.toolInvocations.Load(),
-		ResourceReads:     m.resourceReads.Load(),
-		CacheHits:         hits,
-		CacheMisses:       misses,
-		CacheHitRate:      hitRate,
-		Errors:            m.errors.Load(),
+		Uptime:          time.Since(m.startTime),
+		ToolInvocations: m.toolInvocations.Load(),
+		ResourceReads:   m.resourceReads.Load(),
+		CacheHits:       hits,
+		CacheMisses:     misses,
+		CacheHitRate:    hitRate,
+		Errors:          m.errors.Load(),
 	}
 }
 
