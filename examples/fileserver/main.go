@@ -134,7 +134,9 @@ func readExampleFile(srv *hypermcp.Server, baseDir string, req *mcp.ReadResource
 	uri := req.Params.URI
 	filename := filepath.Base(uri)
 
-	// Security: prevent directory traversal
+	// Security: prevent directory traversal attacks
+	// Check 1: Reject absolute paths
+	// Check 2: Ensure the file is in the current directory (no parent references)
 	if filepath.IsAbs(filename) || filepath.Dir(filename) != "." {
 		return nil, fmt.Errorf("invalid filename")
 	}
@@ -144,6 +146,10 @@ func readExampleFile(srv *hypermcp.Server, baseDir string, req *mcp.ReadResource
 	// Ensure the resolved path is still within the expected directory
 	allowedDir := filepath.Clean(filepath.Join(baseDir, ".."))
 	rel, relErr := filepath.Rel(allowedDir, fullPath)
+	// Security validation: the relative path must not escape the allowed directory
+	// - relErr means the paths are on different drives or the operation failed
+	// - ".." or "." means we're at the boundary
+	// - strings.HasPrefix(rel, "..") means we're trying to go above the allowed dir
 	if relErr != nil || rel == ".." || rel == "." || strings.HasPrefix(rel, "..") {
 		return nil, fmt.Errorf("invalid path")
 	}

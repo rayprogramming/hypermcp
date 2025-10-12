@@ -4,6 +4,7 @@ package httpx
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -13,6 +14,38 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"go.uber.org/zap"
 )
+
+// Sentinel errors for httpx configuration validation.
+var (
+	// ErrInvalidTimeout indicates a timeout value is not positive.
+	ErrInvalidTimeout = errors.New("timeout must be positive")
+
+	// ErrInvalidMaxRetries indicates MaxRetries is negative.
+	ErrInvalidMaxRetries = errors.New("MaxRetries cannot be negative")
+
+	// ErrInvalidMaxResponseSize indicates MaxResponseSize is not positive.
+	ErrInvalidMaxResponseSize = errors.New("MaxResponseSize must be positive")
+
+	// ErrInvalidMaxIdleConns indicates MaxIdleConns is not positive.
+	ErrInvalidMaxIdleConns = errors.New("MaxIdleConns must be positive")
+
+	// ErrInvalidRetryInterval indicates retry interval is not positive.
+	ErrInvalidRetryInterval = errors.New("retry interval must be positive")
+)
+
+// ConfigError wraps httpx configuration validation errors with context.
+type ConfigError struct {
+	Err   error
+	Field string
+}
+
+func (e *ConfigError) Error() string {
+	return fmt.Sprintf("httpx config validation error in field %q: %v", e.Field, e.Err)
+}
+
+func (e *ConfigError) Unwrap() error {
+	return e.Err
+}
 
 // Config holds HTTP client configuration options.
 type Config struct {
@@ -34,6 +67,19 @@ type Config struct {
 	MaxIdleConns        int
 	MaxIdleConnsPerHost int
 	IdleConnTimeout     time.Duration
+
+	// UserAgent to use in HTTP requests (optional, defaults to "hypermcp")
+	UserAgent string
+
+	// DisableCompression, if true, prevents the Transport from requesting compression
+	// with an "Accept-Encoding: gzip" request header when the Request contains no
+	// existing Accept-Encoding value. Defaults to false (compression enabled).
+	DisableCompression bool
+
+	// ForceAttemptHTTP2 controls whether HTTP/2 is enabled when a non-zero
+	// Dial, DialTLS, or DialContext func or TLSClientConfig is provided.
+	// Defaults to true.
+	ForceAttemptHTTP2 bool
 }
 
 // DefaultConfig returns sensible default configuration for the HTTP client.
@@ -50,7 +96,83 @@ func DefaultConfig() Config {
 		MaxIdleConns:          100,
 		MaxIdleConnsPerHost:   10,
 		IdleConnTimeout:       90 * time.Second,
+		UserAgent:             "hypermcp",
+		DisableCompression:    false, // Enable gzip compression
+		ForceAttemptHTTP2:     true,  // Enable HTTP/2
 	}
+}
+
+// Validate checks if the configuration is valid.
+//
+// Returns a ConfigError if any field contains an invalid value.
+func (c Config) Validate() error {
+	if c.DialTimeout <= 0 {
+		return &ConfigError{
+			Err:   ErrInvalidTimeout,
+			Field: "DialTimeout",
+		}
+	}
+	if c.TLSHandshakeTimeout <= 0 {
+		return &ConfigError{
+			Err:   ErrInvalidTimeout,
+			Field: "TLSHandshakeTimeout",
+		}
+	}
+	if c.ResponseHeaderTimeout <= 0 {
+		return &ConfigError{
+			Err:   ErrInvalidTimeout,
+			Field: "ResponseHeaderTimeout",
+		}
+	}
+	if c.RequestTimeout <= 0 {
+		return &ConfigError{
+			Err:   ErrInvalidTimeout,
+			Field: "RequestTimeout",
+		}
+	}
+	if c.MaxRetries < 0 {
+		return &ConfigError{
+			Err:   ErrInvalidMaxRetries,
+			Field: "MaxRetries",
+		}
+	}
+	if c.InitialInterval <= 0 {
+		return &ConfigError{
+			Err:   ErrInvalidRetryInterval,
+			Field: "InitialInterval",
+		}
+	}
+	if c.MaxInterval <= 0 {
+		return &ConfigError{
+			Err:   ErrInvalidRetryInterval,
+			Field: "MaxInterval",
+		}
+	}
+	if c.MaxResponseSize <= 0 {
+		return &ConfigError{
+			Err:   ErrInvalidMaxResponseSize,
+			Field: "MaxResponseSize",
+		}
+	}
+	if c.MaxIdleConns <= 0 {
+		return &ConfigError{
+			Err:   ErrInvalidMaxIdleConns,
+			Field: "MaxIdleConns",
+		}
+	}
+	if c.MaxIdleConnsPerHost <= 0 {
+		return &ConfigError{
+			Err:   ErrInvalidMaxIdleConns,
+			Field: "MaxIdleConnsPerHost",
+		}
+	}
+	if c.IdleConnTimeout <= 0 {
+		return &ConfigError{
+			Err:   ErrInvalidTimeout,
+			Field: "IdleConnTimeout",
+		}
+	}
+	return nil
 }
 
 // Client wraps an HTTP client with retry logic and performance optimizations
@@ -61,12 +183,19 @@ type Client struct {
 }
 
 // New creates a new HTTP client with default configuration.
-func New(logger *zap.Logger) *Client {
+func New(logger *zap.Logger) (*Client, error) {
 	return NewWithConfig(DefaultConfig(), logger)
 }
 
 // NewWithConfig creates a new HTTP client with custom configuration.
-func NewWithConfig(cfg Config, logger *zap.Logger) *Client {
+//
+// Returns an error if the configuration is invalid.
+func NewWithConfig(cfg Config, logger *zap.Logger) (*Client, error) {
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
 	transport := &http.Transport{
 		DialContext: (&net.Dialer{
 			Timeout:   cfg.DialTimeout,
@@ -77,8 +206,8 @@ func NewWithConfig(cfg Config, logger *zap.Logger) *Client {
 		MaxIdleConns:          cfg.MaxIdleConns,
 		MaxIdleConnsPerHost:   cfg.MaxIdleConnsPerHost,
 		IdleConnTimeout:       cfg.IdleConnTimeout,
-		DisableCompression:    false, // Enable gzip
-		ForceAttemptHTTP2:     true,
+		DisableCompression:    cfg.DisableCompression,
+		ForceAttemptHTTP2:     cfg.ForceAttemptHTTP2,
 	}
 
 	return &Client{
@@ -88,11 +217,23 @@ func NewWithConfig(cfg Config, logger *zap.Logger) *Client {
 		},
 		logger: logger,
 		config: cfg,
-	}
+	}, nil
 }
 
-// DoJSON performs an HTTP request and unmarshals the JSON response
-// It includes retry logic with exponential backoff for transient errors
+// DoJSON performs an HTTP request and unmarshals the JSON response.
+// It includes retry logic with exponential backoff for transient errors.
+//
+// The method automatically handles:
+// - Exponential backoff with jitter for retryable errors (429, 5xx)
+// - Request timeouts to prevent hanging
+// - Response size limits to prevent memory exhaustion (10MB default)
+// - Context cancellation for early termination
+//
+// Retryable status codes: 429 (Too Many Requests), 500-504 (Server Errors)
+// Non-retryable errors: 4xx (except 429), JSON decode errors, network errors
+//
+// The request context controls the overall timeout, while individual retry
+// attempts have their own timeouts configured via Config.RequestTimeout.
 func (c *Client) DoJSON(ctx context.Context, req *http.Request, result interface{}) error {
 	reqID := fmt.Sprintf("%p", req)
 	startTime := time.Now()
@@ -201,7 +342,12 @@ func (c *Client) Get(ctx context.Context, url string, result interface{}) error 
 		return fmt.Errorf("create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "hypermcp/0.1.0")
+	// Use configured UserAgent or default
+	userAgent := c.config.UserAgent
+	if userAgent == "" {
+		userAgent = "hypermcp"
+	}
+	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/json")
 	// Don't set Accept-Encoding manually - let Go's Transport handle gzip automatically
 	// when DisableCompression is false

@@ -2,12 +2,41 @@ package cache
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/dgraph-io/ristretto"
 	"go.uber.org/zap"
 )
+
+// Sentinel errors for cache validation.
+var (
+	// ErrInvalidMaxCost indicates MaxCost is not positive.
+	ErrInvalidMaxCost = errors.New("MaxCost must be positive")
+
+	// ErrInvalidNumCounters indicates NumCounters is not positive.
+	ErrInvalidNumCounters = errors.New("NumCounters must be positive")
+
+	// ErrInvalidBufferItems indicates BufferItems is not positive.
+	ErrInvalidBufferItems = errors.New("BufferItems must be positive")
+)
+
+// ValidationError wraps cache configuration validation errors with context.
+type ValidationError struct {
+	Err   error
+	Field string
+	Value int64
+}
+
+func (e *ValidationError) Error() string {
+	return fmt.Sprintf("cache config validation error in field %q: %v (got %d)", e.Field, e.Err, e.Value)
+}
+
+func (e *ValidationError) Unwrap() error {
+	return e.Err
+}
 
 // Cache provides a high-performance in-memory cache
 type Cache struct {
@@ -39,6 +68,29 @@ func DefaultConfig() Config {
 
 // New creates a new cache instance
 func New(cfg Config, logger *zap.Logger) (*Cache, error) {
+	// Validate configuration
+	if cfg.MaxCost <= 0 {
+		return nil, &ValidationError{
+			Err:   ErrInvalidMaxCost,
+			Field: "MaxCost",
+			Value: cfg.MaxCost,
+		}
+	}
+	if cfg.NumCounters <= 0 {
+		return nil, &ValidationError{
+			Err:   ErrInvalidNumCounters,
+			Field: "NumCounters",
+			Value: cfg.NumCounters,
+		}
+	}
+	if cfg.BufferItems <= 0 {
+		return nil, &ValidationError{
+			Err:   ErrInvalidBufferItems,
+			Field: "BufferItems",
+			Value: cfg.BufferItems,
+		}
+	}
+
 	store, err := ristretto.NewCache(&ristretto.Config[string, any]{
 		MaxCost:     cfg.MaxCost,
 		NumCounters: cfg.NumCounters,
@@ -63,7 +115,15 @@ func New(cfg Config, logger *zap.Logger) (*Cache, error) {
 	return c, nil
 }
 
-// Get retrieves a value from the cache
+// Get retrieves a value from the cache and checks TTL expiration.
+//
+// This method performs both ristretto cache lookup and TTL validation.
+// If the value has expired based on its TTL, it's automatically deleted
+// and treated as a cache miss. The TTL check is performed atomically
+// to prevent race conditions.
+//
+// Returns the cached value and true if found and not expired,
+// or nil and false if not found or expired.
 func (c *Cache) Get(key string) (any, bool) {
 	c.mu.RLock()
 	expiry, hasExpiry := c.ttls[key]
@@ -83,7 +143,17 @@ func (c *Cache) Get(key string) (any, bool) {
 	return value, true
 }
 
-// Set stores a value in the cache with TTL
+// Set stores a value in the cache with TTL (time-to-live).
+//
+// The value is stored with an estimated cost (64 bytes base overhead).
+// If the cache is full and cannot evict items, the set operation may fail
+// silently. This is by design in Ristretto to maintain performance.
+//
+// TTL is tracked separately and enforced on Get() and by a background
+// cleanup goroutine that runs every 30 seconds. Setting ttl to 0 means
+// the value never expires (until explicitly deleted or evicted).
+//
+// This method is thread-safe and can be called concurrently.
 func (c *Cache) Set(key string, value any, ttl time.Duration) {
 	// Calculate cost (rough estimate based on type)
 	cost := int64(64) // base overhead
