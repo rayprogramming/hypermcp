@@ -1,7 +1,7 @@
 # golangci-lint configuration for hypermcp
 # See https://golangci-lint.run/usage/configuration/ for full options
 
-version: 2
+version: "2"
 
 run:
   timeout: 5m
@@ -9,8 +9,6 @@ run:
   modules-download-mode: readonly
 
 linters:
-  default: standard
-  
   enable:
     # Additional recommended linters
     - bodyclose     # Check HTTP response body is closed
@@ -75,46 +73,9 @@ linters:
         - G104 # Audit use of errors, already covered by errcheck
         - G307 # Defer error handling is checked elsewhere
 
-formatters:
-  enable:
-    - gofmt         # Check code formatting
-    - goimports     # Check import ordering
-
 issues:
-  # Maximum issues count per one linter
   max-issues-per-linter: 50
-  
-  # Maximum count of issues with the same text
   max-same-issues: 3
-
-  exclusions:
-    presets:
-      - comments
-      - std-error-handling
-      - common-false-positives
-      - legacy
-    
-    rules:
-      # Exclude examples directory - these are for demonstration purposes
-      - path: examples/
-        linters:
-          - errcheck
-          - gosec
-          - govet
-          - gofmt
-      
-      # Exclude some linters from running on tests files
-      - path: _test\.go
-        linters:
-          - dupl
-          - gosec
-          - gocyclo
-          - gocognit
-        
-      # Exclude specific staticcheck messages
-      - linters:
-          - staticcheck
-        text: "SA1019:" # Ignore deprecation warnings
 
 output:
   formats:
