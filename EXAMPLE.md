@@ -358,6 +358,33 @@ Add to `~/.config/Code/User/globalStorage/github.copilot-chat/mcpServers.json`:
 }
 ```
 
+## Metrics and Observability
+
+Track server performance with built-in metrics:
+
+```go
+// Get current metrics
+metrics := srv.GetMetrics()
+fmt.Printf("Uptime: %v\n", metrics.Uptime)
+fmt.Printf("Tool invocations: %d\n", metrics.ToolInvocations)
+fmt.Printf("Resource reads: %d\n", metrics.ResourceReads)
+fmt.Printf("Cache hit rate: %.2f%%\n", metrics.CacheHitRate*100)
+fmt.Printf("Errors: %d\n", metrics.Errors)
+
+// Track custom metrics
+srv.Metrics().IncrementToolInvocations()
+srv.Metrics().IncrementCacheHits()
+srv.Metrics().IncrementErrors()
+```
+
+Available metrics:
+- **Uptime**: How long the server has been running
+- **ToolInvocations**: Number of tool calls
+- **ResourceReads**: Number of resource reads
+- **CacheHits/Misses**: Cache performance
+- **CacheHitRate**: Percentage of cache hits
+- **Errors**: Total error count
+
 ## Next Steps
 
 1. **Add More Tools**: Create more tool functions following the echo example
@@ -365,5 +392,6 @@ Add to `~/.config/Code/User/globalStorage/github.copilot-chat/mcpServers.json`:
 3. **Use HTTP Client**: Use `srv.HTTPClient()` for external API calls
 4. **Use Cache**: Use `srv.Cache()` to cache expensive operations
 5. **Add Resources**: Register resources alongside tools
+6. **Monitor Metrics**: Track performance with `srv.GetMetrics()`
 
 See `hypermcp` for a complete example with multiple providers, resources, and proper error handling!

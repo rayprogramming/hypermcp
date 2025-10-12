@@ -40,6 +40,7 @@ type Server struct {
 	httpClient *httpx.Client
 	cache      *cache.Cache
 	logger     *zap.Logger
+	metrics    *Metrics
 	config     Config
 
 	// Stats for logging
@@ -116,6 +117,7 @@ func New(cfg Config, logger *zap.Logger) (*Server, error) {
 		httpClient: httpClient,
 		cache:      cacheInstance,
 		logger:     logger,
+		metrics:    newMetrics(),
 		config:     cfg,
 	}
 
