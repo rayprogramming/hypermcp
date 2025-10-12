@@ -59,9 +59,9 @@ func RunWithTransport(ctx context.Context, srv *Server, transportType TransportT
 		logger.Info("using stdio transport (recommended)")
 		transport = &mcp.StdioTransport{}
 	case TransportStreamableHTTP:
-		return fmt.Errorf("Streamable HTTP transport not yet implemented")
+		return NewTransportError(transportType, ErrTransportNotSupported)
 	default:
-		return fmt.Errorf("unknown transport type: %s", transportType)
+		return NewTransportError(transportType, fmt.Errorf("unknown transport type"))
 	}
 
 	logger.Info("server ready")

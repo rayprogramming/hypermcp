@@ -20,7 +20,13 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to create logger: %v\n", err)
 		os.Exit(1)
 	}
-	defer logger.Sync()
+	// Sync returns an error on some platforms (e.g., Windows); log and continue
+	defer func() {
+		if syncErr := logger.Sync(); syncErr != nil {
+			// Non-fatal: best effort flush
+			fmt.Fprintf(os.Stderr, "logger sync error: %v\n", syncErr)
+		}
+	}()
 
 	// Create server configuration
 	cfg := hypermcp.Config{
@@ -80,17 +86,19 @@ func main() {
 	}()
 
 	// Run server
-	if err := hypermcp.RunWithTransport(ctx, srv, hypermcp.TransportStdio, logger); err != nil {
-		logger.Error("server error", zap.Error(err))
+	var runErr error
+	if runErr = hypermcp.RunWithTransport(ctx, srv, hypermcp.TransportStdio, logger); runErr != nil {
+		logger.Error("server error", zap.Error(runErr))
 		os.Exit(1)
 	}
 
 	// Graceful shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-	
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Error("shutdown error", zap.Error(err))
+
+	var shutdownErr error
+	if shutdownErr = srv.Shutdown(shutdownCtx); shutdownErr != nil {
+		logger.Error("shutdown error", zap.Error(shutdownErr))
 	}
 
 	logger.Info("server stopped")

@@ -2,6 +2,7 @@ package hypermcp
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -11,9 +12,8 @@ import (
 
 func TestConfig_Validate(t *testing.T) {
 	tests := []struct {
-		name    string
-		errMsg  string
 		config  Config
+		name    string
 		wantErr bool
 	}{
 		{
@@ -32,7 +32,6 @@ func TestConfig_Validate(t *testing.T) {
 				Version: "1.0.0",
 			},
 			wantErr: true,
-			errMsg:  "server name cannot be empty",
 		},
 		{
 			name: "empty version",
@@ -41,7 +40,6 @@ func TestConfig_Validate(t *testing.T) {
 				Version: "",
 			},
 			wantErr: true,
-			errMsg:  "server version cannot be empty",
 		},
 		{
 			name: "both empty",
@@ -50,7 +48,6 @@ func TestConfig_Validate(t *testing.T) {
 				Version: "",
 			},
 			wantErr: true,
-			errMsg:  "server name cannot be empty",
 		},
 	}
 
@@ -60,8 +57,11 @@ func TestConfig_Validate(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Error("expected error but got nil")
-				} else if err.Error() != tt.errMsg {
-					t.Errorf("expected error %q, got %q", tt.errMsg, err.Error())
+				}
+				// Check that it's a ConfigError
+				var configErr *ConfigError
+				if !errors.As(err, &configErr) {
+					t.Errorf("expected ConfigError, got %T", err)
 				}
 			} else {
 				if err != nil {
@@ -76,9 +76,9 @@ func TestNew_ValidationError(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 
 	tests := []struct {
-		name    string
-		wantErr string
+		wantErr error
 		config  Config
+		name    string
 	}{
 		{
 			name: "empty name",
@@ -86,7 +86,7 @@ func TestNew_ValidationError(t *testing.T) {
 				Name:    "",
 				Version: "1.0.0",
 			},
-			wantErr: "invalid config: server name cannot be empty",
+			wantErr: ErrInvalidConfig,
 		},
 		{
 			name: "empty version",
@@ -94,7 +94,7 @@ func TestNew_ValidationError(t *testing.T) {
 				Name:    "test-server",
 				Version: "",
 			},
-			wantErr: "invalid config: server version cannot be empty",
+			wantErr: ErrInvalidConfig,
 		},
 	}
 
@@ -104,8 +104,8 @@ func TestNew_ValidationError(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error but got nil")
 			}
-			if err.Error() != tt.wantErr {
-				t.Errorf("expected error %q, got %q", tt.wantErr, err.Error())
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("expected error to wrap %v, got %v", tt.wantErr, err)
 			}
 		})
 	}

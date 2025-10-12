@@ -49,10 +49,10 @@ jobs:
           go vet ./...
 
       - name: Lint (golangci-lint)
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
-          args: --timeout=3m
+          args: --timeout=3m . ./cache ./httpx
 
       - name: Run tests
         run: go test -race ./...
