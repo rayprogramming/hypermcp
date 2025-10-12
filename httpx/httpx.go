@@ -149,8 +149,12 @@ func (c *Client) DoJSON(ctx context.Context, req *http.Request, result interface
 	expBackoff.MaxInterval = c.config.MaxInterval
 	expBackoff.MaxElapsedTime = c.config.RequestTimeout
 
-	// MaxRetries is always >= 0 and <= 10, safe to convert to uint64
-	backoffWithRetries := backoff.WithMaxRetries(expBackoff, uint64(c.config.MaxRetries)) // #nosec G115
+	// Clamp MaxRetries to zero if negative before converting to uint64
+	maxRetries := c.config.MaxRetries
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+	backoffWithRetries := backoff.WithMaxRetries(expBackoff, uint64(maxRetries)) // #nosec G115
 	backoffWithContext := backoff.WithContext(backoffWithRetries, ctx)
 
 	err := backoff.Retry(operation, backoffWithContext)
