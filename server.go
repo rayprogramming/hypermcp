@@ -86,7 +86,7 @@ func New(cfg Config, logger *zap.Logger) (*Server, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
-	
+
 	// Create shared HTTP client with optional custom config
 	var httpClient *httpx.Client
 	if cfg.HTTPConfig != nil {
@@ -185,11 +185,27 @@ func (s *Server) IncrementResourceCount() {
 // LogRegistrationStats logs the number of registered tools and resources.
 //
 // This is useful for debugging and verifying that all expected features were registered.
+// Also includes cache configuration information if caching is enabled.
 func (s *Server) LogRegistrationStats() {
-	s.logger.Info("registered tools and resources",
+	fields := []zap.Field{
 		zap.Int("tools", s.toolCount),
 		zap.Int("resources", s.resourceCount),
-	)
+	}
+
+	// Add cache info if enabled
+	if s.config.CacheEnabled && s.cache != nil {
+		metrics := s.cache.Metrics()
+		fields = append(fields,
+			zap.Bool("cache_enabled", true),
+			zap.Uint64("cache_hits", metrics.Hits()),
+			zap.Uint64("cache_misses", metrics.Misses()),
+			zap.Float64("cache_ratio", metrics.Ratio()),
+		)
+	} else {
+		fields = append(fields, zap.Bool("cache_enabled", false))
+	}
+
+	s.logger.Info("registered tools and resources", fields...)
 }
 
 // Run starts the server with the given transport.
