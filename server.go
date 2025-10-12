@@ -89,15 +89,21 @@ func New(cfg Config, logger *zap.Logger) (*Server, error) {
 
 	// Create shared HTTP client with optional custom config
 	var httpClient *httpx.Client
+	var err error
 	if cfg.HTTPConfig != nil {
-		httpClient = httpx.NewWithConfig(*cfg.HTTPConfig, logger)
+		httpClient, err = httpx.NewWithConfig(*cfg.HTTPConfig, logger)
+		if err != nil {
+			return nil, fmt.Errorf("create http client: %w", err)
+		}
 	} else {
-		httpClient = httpx.New(logger)
+		httpClient, err = httpx.New(logger)
+		if err != nil {
+			return nil, fmt.Errorf("create http client: %w", err)
+		}
 	}
 
 	// Create cache
 	var cacheInstance *cache.Cache
-	var err error
 	if cfg.CacheEnabled {
 		cacheInstance, err = cache.New(cfg.CacheConfig, logger)
 		if err != nil {
