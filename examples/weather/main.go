@@ -20,7 +20,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to create logger: %v\n", err)
 		os.Exit(1)
 	}
-	defer logger.Sync()
+	// Flush logs on exit; ignore non-fatal sync errors
+	defer func() {
+		if syncErr := logger.Sync(); syncErr != nil {
+			fmt.Fprintf(os.Stderr, "logger sync error: %v\n", syncErr)
+		}
+	}()
 
 	// Create server with caching enabled
 	cfg := hypermcp.Config{
@@ -60,7 +65,7 @@ func main() {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
 					&mcp.TextContent{
-						Text: cached.(string),
+						Text: fmt.Sprintf("%v", cached),
 					},
 				},
 			}, nil, nil
@@ -147,17 +152,19 @@ func main() {
 	}()
 
 	// Run server
-	if err := hypermcp.RunWithTransport(ctx, srv, hypermcp.TransportStdio, logger); err != nil {
-		logger.Error("server error", zap.Error(err))
+	var runErr error
+	if runErr = hypermcp.RunWithTransport(ctx, srv, hypermcp.TransportStdio, logger); runErr != nil {
+		logger.Error("server error", zap.Error(runErr))
 		os.Exit(1)
 	}
 
 	// Graceful shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-	
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Error("shutdown error", zap.Error(err))
+
+	var shutdownErr error
+	if shutdownErr = srv.Shutdown(shutdownCtx); shutdownErr != nil {
+		logger.Error("shutdown error", zap.Error(shutdownErr))
 	}
 
 	logger.Info("server stopped")

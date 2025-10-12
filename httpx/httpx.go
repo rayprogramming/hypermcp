@@ -14,40 +14,69 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	// HTTP timeouts
-	dialTimeout           = 2 * time.Second
-	tlsHandshakeTimeout   = 2 * time.Second
-	responseHeaderTimeout = 4 * time.Second
-	requestTimeout        = 6 * time.Second
+// Config holds HTTP client configuration options.
+type Config struct {
+	// Timeouts
+	DialTimeout           time.Duration
+	TLSHandshakeTimeout   time.Duration
+	ResponseHeaderTimeout time.Duration
+	RequestTimeout        time.Duration
 
 	// Retry configuration
-	maxRetries      = 3
-	initialInterval = 100 * time.Millisecond
-	maxInterval     = 2 * time.Second
+	MaxRetries      int
+	InitialInterval time.Duration
+	MaxInterval     time.Duration
 
 	// Request limits
-	maxResponseSize = 10 * 1024 * 1024 // 10MB
-)
+	MaxResponseSize int64
+
+	// Connection pooling
+	MaxIdleConns        int
+	MaxIdleConnsPerHost int
+	IdleConnTimeout     time.Duration
+}
+
+// DefaultConfig returns sensible default configuration for the HTTP client.
+func DefaultConfig() Config {
+	return Config{
+		DialTimeout:           2 * time.Second,
+		TLSHandshakeTimeout:   2 * time.Second,
+		ResponseHeaderTimeout: 4 * time.Second,
+		RequestTimeout:        6 * time.Second,
+		MaxRetries:            3,
+		InitialInterval:       100 * time.Millisecond,
+		MaxInterval:           2 * time.Second,
+		MaxResponseSize:       10 * 1024 * 1024, // 10MB
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   10,
+		IdleConnTimeout:       90 * time.Second,
+	}
+}
 
 // Client wraps an HTTP client with retry logic and performance optimizations
 type Client struct {
 	client *http.Client
 	logger *zap.Logger
+	config Config
 }
 
-// New creates a new HTTP client with optimal settings for performance
+// New creates a new HTTP client with default configuration.
 func New(logger *zap.Logger) *Client {
+	return NewWithConfig(DefaultConfig(), logger)
+}
+
+// NewWithConfig creates a new HTTP client with custom configuration.
+func NewWithConfig(cfg Config, logger *zap.Logger) *Client {
 	transport := &http.Transport{
 		DialContext: (&net.Dialer{
-			Timeout:   dialTimeout,
+			Timeout:   cfg.DialTimeout,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
-		TLSHandshakeTimeout:   tlsHandshakeTimeout,
-		ResponseHeaderTimeout: responseHeaderTimeout,
-		MaxIdleConns:          100,
-		MaxIdleConnsPerHost:   10,
-		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   cfg.TLSHandshakeTimeout,
+		ResponseHeaderTimeout: cfg.ResponseHeaderTimeout,
+		MaxIdleConns:          cfg.MaxIdleConns,
+		MaxIdleConnsPerHost:   cfg.MaxIdleConnsPerHost,
+		IdleConnTimeout:       cfg.IdleConnTimeout,
 		DisableCompression:    false, // Enable gzip
 		ForceAttemptHTTP2:     true,
 	}
@@ -55,9 +84,10 @@ func New(logger *zap.Logger) *Client {
 	return &Client{
 		client: &http.Client{
 			Transport: transport,
-			Timeout:   requestTimeout,
+			Timeout:   cfg.RequestTimeout,
 		},
 		logger: logger,
+		config: cfg,
 	}
 }
 
@@ -86,7 +116,7 @@ func (c *Client) DoJSON(ctx context.Context, req *http.Request, result interface
 		}()
 
 		// Limit response size to prevent memory exhaustion
-		limitedReader := io.LimitReader(resp.Body, maxResponseSize)
+		limitedReader := io.LimitReader(resp.Body, c.config.MaxResponseSize)
 
 		// Check for retryable HTTP status codes
 		if shouldRetry(resp.StatusCode) {
@@ -115,11 +145,16 @@ func (c *Client) DoJSON(ctx context.Context, req *http.Request, result interface
 
 	// Configure exponential backoff with jitter
 	expBackoff := backoff.NewExponentialBackOff()
-	expBackoff.InitialInterval = initialInterval
-	expBackoff.MaxInterval = maxInterval
-	expBackoff.MaxElapsedTime = requestTimeout
+	expBackoff.InitialInterval = c.config.InitialInterval
+	expBackoff.MaxInterval = c.config.MaxInterval
+	expBackoff.MaxElapsedTime = c.config.RequestTimeout
 
-	backoffWithRetries := backoff.WithMaxRetries(expBackoff, maxRetries)
+	// Clamp MaxRetries to zero if negative before converting to uint64
+	maxRetries := c.config.MaxRetries
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+	backoffWithRetries := backoff.WithMaxRetries(expBackoff, uint64(maxRetries)) // #nosec G115
 	backoffWithContext := backoff.WithContext(backoffWithRetries, ctx)
 
 	err := backoff.Retry(operation, backoffWithContext)

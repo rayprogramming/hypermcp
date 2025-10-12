@@ -52,11 +52,13 @@ type Server struct {
 //
 // Name and Version are required fields and will be validated.
 // CacheEnabled determines whether to initialize a full cache instance.
+// HTTPConfig allows customization of HTTP client behavior (optional, uses defaults if not set).
 type Config struct {
+	HTTPConfig   *httpx.Config // Optional: uses defaults if nil
+	CacheConfig  cache.Config
 	Name         string
 	Version      string
 	CacheEnabled bool
-	CacheConfig  cache.Config
 }
 
 // Validate checks if the configuration is valid.
@@ -64,10 +66,10 @@ type Config struct {
 // Returns an error if Name or Version is empty.
 func (c Config) Validate() error {
 	if c.Name == "" {
-		return fmt.Errorf("server name cannot be empty")
+		return NewConfigError("Name", fmt.Errorf("cannot be empty"))
 	}
 	if c.Version == "" {
-		return fmt.Errorf("server version cannot be empty")
+		return NewConfigError("Version", fmt.Errorf("cannot be empty"))
 	}
 	return nil
 }
@@ -82,10 +84,16 @@ func (c Config) Validate() error {
 func New(cfg Config, logger *zap.Logger) (*Server, error) {
 	// Validate configuration
 	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrInvalidConfig, err)
 	}
-	// Create shared HTTP client
-	httpClient := httpx.New(logger)
+
+	// Create shared HTTP client with optional custom config
+	var httpClient *httpx.Client
+	if cfg.HTTPConfig != nil {
+		httpClient = httpx.NewWithConfig(*cfg.HTTPConfig, logger)
+	} else {
+		httpClient = httpx.New(logger)
+	}
 
 	// Create cache
 	var cacheInstance *cache.Cache
@@ -177,11 +185,27 @@ func (s *Server) IncrementResourceCount() {
 // LogRegistrationStats logs the number of registered tools and resources.
 //
 // This is useful for debugging and verifying that all expected features were registered.
+// Also includes cache configuration information if caching is enabled.
 func (s *Server) LogRegistrationStats() {
-	s.logger.Info("registered tools and resources",
+	fields := []zap.Field{
 		zap.Int("tools", s.toolCount),
 		zap.Int("resources", s.resourceCount),
-	)
+	}
+
+	// Add cache info if enabled
+	if s.config.CacheEnabled && s.cache != nil {
+		metrics := s.cache.Metrics()
+		fields = append(fields,
+			zap.Bool("cache_enabled", true),
+			zap.Uint64("cache_hits", metrics.Hits()),
+			zap.Uint64("cache_misses", metrics.Misses()),
+			zap.Float64("cache_ratio", metrics.Ratio()),
+		)
+	} else {
+		fields = append(fields, zap.Bool("cache_enabled", false))
+	}
+
+	s.logger.Info("registered tools and resources", fields...)
 }
 
 // Run starts the server with the given transport.
