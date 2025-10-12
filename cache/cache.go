@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -9,6 +10,33 @@ import (
 	"github.com/dgraph-io/ristretto"
 	"go.uber.org/zap"
 )
+
+// Sentinel errors for cache validation.
+var (
+	// ErrInvalidMaxCost indicates MaxCost is not positive.
+	ErrInvalidMaxCost = errors.New("MaxCost must be positive")
+
+	// ErrInvalidNumCounters indicates NumCounters is not positive.
+	ErrInvalidNumCounters = errors.New("NumCounters must be positive")
+
+	// ErrInvalidBufferItems indicates BufferItems is not positive.
+	ErrInvalidBufferItems = errors.New("BufferItems must be positive")
+)
+
+// ValidationError wraps cache configuration validation errors with context.
+type ValidationError struct {
+	Err   error
+	Field string
+	Value int64
+}
+
+func (e *ValidationError) Error() string {
+	return fmt.Sprintf("cache config validation error in field %q: %v (got %d)", e.Field, e.Err, e.Value)
+}
+
+func (e *ValidationError) Unwrap() error {
+	return e.Err
+}
 
 // Cache provides a high-performance in-memory cache
 type Cache struct {
@@ -42,13 +70,25 @@ func DefaultConfig() Config {
 func New(cfg Config, logger *zap.Logger) (*Cache, error) {
 	// Validate configuration
 	if cfg.MaxCost <= 0 {
-		return nil, fmt.Errorf("MaxCost must be positive, got %d", cfg.MaxCost)
+		return nil, &ValidationError{
+			Err:   ErrInvalidMaxCost,
+			Field: "MaxCost",
+			Value: cfg.MaxCost,
+		}
 	}
 	if cfg.NumCounters <= 0 {
-		return nil, fmt.Errorf("NumCounters must be positive, got %d", cfg.NumCounters)
+		return nil, &ValidationError{
+			Err:   ErrInvalidNumCounters,
+			Field: "NumCounters",
+			Value: cfg.NumCounters,
+		}
 	}
 	if cfg.BufferItems <= 0 {
-		return nil, fmt.Errorf("BufferItems must be positive, got %d", cfg.BufferItems)
+		return nil, &ValidationError{
+			Err:   ErrInvalidBufferItems,
+			Field: "BufferItems",
+			Value: cfg.BufferItems,
+		}
 	}
 
 	store, err := ristretto.NewCache(&ristretto.Config[string, any]{

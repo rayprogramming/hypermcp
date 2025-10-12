@@ -1,9 +1,11 @@
 package cache
 
 import (
+	"errors"
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -11,9 +13,10 @@ func TestNew_InvalidConfig(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 
 	tests := []struct {
-		name      string
-		cfg       Config
-		wantError bool
+		name          string
+		cfg           Config
+		wantError     bool
+		expectedError error
 	}{
 		{
 			name: "valid config",
@@ -31,7 +34,8 @@ func TestNew_InvalidConfig(t *testing.T) {
 				NumCounters: 100,
 				BufferItems: 10,
 			},
-			wantError: true,
+			wantError:     true,
+			expectedError: ErrInvalidMaxCost,
 		},
 		{
 			name: "negative MaxCost",
@@ -40,7 +44,8 @@ func TestNew_InvalidConfig(t *testing.T) {
 				NumCounters: 100,
 				BufferItems: 10,
 			},
-			wantError: true,
+			wantError:     true,
+			expectedError: ErrInvalidMaxCost,
 		},
 		{
 			name: "zero NumCounters",
@@ -49,7 +54,8 @@ func TestNew_InvalidConfig(t *testing.T) {
 				NumCounters: 0,
 				BufferItems: 10,
 			},
-			wantError: true,
+			wantError:     true,
+			expectedError: ErrInvalidNumCounters,
 		},
 		{
 			name: "zero BufferItems",
@@ -58,26 +64,47 @@ func TestNew_InvalidConfig(t *testing.T) {
 				NumCounters: 100,
 				BufferItems: 0,
 			},
-			wantError: true,
+			wantError:     true,
+			expectedError: ErrInvalidBufferItems,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := New(tt.cfg, logger)
-			if tt.wantError {
-				if err == nil {
-					t.Error("expected error but got none")
-				}
-			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-				if c != nil {
-					c.Close()
-				}
-			}
+			runConfigTest(t, logger, tt.cfg, tt.wantError, tt.expectedError)
 		})
+	}
+}
+
+func runConfigTest(t *testing.T, logger *zap.Logger, cfg Config, wantError bool, expectedError error) {
+	t.Helper()
+	c, err := New(cfg, logger)
+
+	if !wantError {
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if c != nil {
+			c.Close()
+		}
+		return
+	}
+
+	// Error expected
+	if err == nil {
+		t.Error("expected error but got none")
+		return
+	}
+
+	// Check that the error is the expected sentinel error
+	if expectedError != nil && !errors.Is(err, expectedError) {
+		t.Errorf("expected error %v, got %v", expectedError, err)
+	}
+
+	// Check that it's a ValidationError
+	var valErr *ValidationError
+	if !errors.As(err, &valErr) {
+		t.Errorf("expected ValidationError type, got %T", err)
 	}
 }
 
