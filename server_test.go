@@ -3,7 +3,6 @@ package hypermcp
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rayprogramming/hypermcp/cache"
@@ -358,12 +357,6 @@ func TestServer_Shutdown(t *testing.T) {
 			err = srv.Shutdown(ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Shutdown() error = %v, wantErr %v", err, tt.wantErr)
-			}
-
-			// Give a tiny bit of time for any async operations to complete
-			// to avoid race conditions in test cleanup
-			if !tt.withTimeout {
-				time.Sleep(10 * time.Millisecond)
 			}
 		})
 	}

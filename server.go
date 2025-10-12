@@ -251,9 +251,8 @@ func (s *Server) AddResourceTemplate(template *mcp.ResourceTemplate, handler mcp
 
 // Shutdown performs cleanup and gracefully shuts down the server.
 //
-// This method closes the cache and logs final statistics. It respects the provided
-// context's deadline or cancellation. If cleanup takes longer than the context allows,
-// it returns the context error.
+// This method closes the cache and logs final statistics. It checks if the provided
+// context was canceled during the cleanup process and returns an error if so.
 //
 // Example:
 //
@@ -265,30 +264,22 @@ func (s *Server) AddResourceTemplate(template *mcp.ResourceTemplate, handler mcp
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.logger.Info("shutting down server")
 
-	// Create a channel to signal completion
-	done := make(chan struct{})
+	// Log final statistics
+	s.LogRegistrationStats()
 
-	go func() {
-		defer close(done)
+	// Close cache
+	if s.cache != nil {
+		s.logger.Debug("closing cache")
+		s.cache.Close()
+	}
 
-		// Log final statistics
-		s.LogRegistrationStats()
+	s.logger.Info("server shutdown complete")
 
-		// Close cache
-		if s.cache != nil {
-			s.logger.Debug("closing cache")
-			s.cache.Close()
-		}
-
-		s.logger.Info("server shutdown complete")
-	}()
-
-	// Wait for cleanup or context cancellation
-	select {
-	case <-done:
-		return nil
-	case <-ctx.Done():
+	// Check if context was canceled during cleanup
+	if ctx.Err() != nil {
 		s.logger.Warn("shutdown canceled or timed out", zap.Error(ctx.Err()))
 		return ctx.Err()
 	}
+
+	return nil
 }

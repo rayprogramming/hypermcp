@@ -13,9 +13,9 @@ updates:
       timezone: "America/Denver"
     open-pull-requests-limit: 5
     reviewers:
-      - "rayprogramming"
+      - "rihoj"
     assignees:
-      - "rayprogramming"
+      - "rihoj"
     commit-message:
       prefix: "chore(deps)"
       prefix-development: "chore(deps-dev)"
@@ -46,9 +46,9 @@ updates:
       timezone: "America/Denver"
     open-pull-requests-limit: 5
     reviewers:
-      - "rayprogramming"
+      - "rihoj"
     assignees:
-      - "rayprogramming"
+      - "rihoj"
     commit-message:
       prefix: "chore(ci)"
       include: "scope"

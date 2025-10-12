@@ -56,7 +56,8 @@ jobs:
 
       - name: Run tests
         run: |
-          go test ./... -race -coverprofile=coverage.out -covermode=atomic
+          go test -race ./...
+          go test -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Upload coverage report
         if: always()
