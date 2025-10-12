@@ -19,7 +19,7 @@ This project follows the [Contributor Covenant Code of Conduct](https://www.cont
 ## Getting Started
 
 ### Prerequisites
-- Go 1.22 or later
+- Go 1.24 or later
 - Git
 - Make (optional, but recommended)
 

@@ -152,5 +152,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Graceful shutdown
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Error("shutdown error", zap.Error(err))
+	}
+
 	logger.Info("server stopped")
 }

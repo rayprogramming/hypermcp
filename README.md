@@ -161,12 +161,14 @@ type Config struct {
 - `HTTPClient() *httpx.Client` - Get the shared HTTP client
 - `Cache() *cache.Cache` - Get the cache instance
 - `Logger() *zap.Logger` - Get the logger
+- `Metrics() *Metrics` - Get metrics instance for tracking
+- `GetMetrics() MetricsSnapshot` - Get snapshot of current metrics
 - `MCP() *mcp.Server` - Get the underlying MCP server
 - `AddResource(resource, handler)` - Register a resource (auto-increments counter)
 - `AddResourceTemplate(template, handler)` - Register a resource template (auto-increments counter)
 - `LogRegistrationStats()` - Log tool/resource counts
 - `Run(ctx, transport)` - Start the server
-- `Shutdown(ctx)` - Gracefully shutdown
+- `Shutdown(ctx)` - Gracefully shutdown (closes cache, logs final stats)
 
 ### Package-Level Functions
 
@@ -219,8 +221,139 @@ Available transports:
 
 ## Examples
 
-See the `hypermcp` implementation in this repository for a complete example with:
-- WIP
+The `examples/` directory contains complete, working examples:
+
+### [hello](examples/hello/) - Basic Server
+Minimal example showing:
+- Server setup with configuration
+- Simple tool registration
+- Graceful shutdown handling
+
+### [weather](examples/weather/) - Caching Demo
+Demonstrates:
+- Enabling and using the cache
+- Cache hit/miss patterns
+- Multiple tools in one server
+- Metrics logging on shutdown
+
+### [metrics](examples/metrics/) - Metrics & Monitoring
+Shows how to:
+- Track tool invocations
+- Monitor cache performance
+- Expose metrics via tools
+- Log periodic statistics
+- Access cache-specific metrics
+
+### [fileserver](examples/fileserver/) - Resource Provider
+Example of:
+- Resource registration
+- Resource templates with parameters
+- Working with files and data
+
+Run any example:
+```bash
+cd examples/hello && go run main.go
+cd examples/weather && go run main.go
+cd examples/metrics && go run main.go
+```
+
+## Performance Metrics
+
+`hypermcp` includes built-in performance tracking:
+
+```go
+// Track operations
+srv.Metrics().IncrementToolInvocations()
+srv.Metrics().IncrementCacheHits()
+srv.Metrics().IncrementCacheMisses()
+srv.Metrics().IncrementErrors()
+
+// Get snapshot
+metrics := srv.GetMetrics()
+fmt.Printf("Uptime: %v\n", metrics.Uptime)
+fmt.Printf("Cache hit rate: %.2f%%\n", metrics.CacheHitRate*100)
+```
+
+Metrics tracked:
+- Server uptime
+- Tool invocations
+- Resource reads
+- Cache hits/misses and hit rate
+- Error counts
+
+## Best Practices
+
+### Graceful Shutdown
+
+Always implement graceful shutdown to ensure resources are properly cleaned up:
+
+```go
+// Setup signal handling
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
+
+sigChan := make(chan os.Signal, 1)
+signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+go func() {
+    <-sigChan
+    logger.Info("shutting down...")
+    cancel()
+}()
+
+// Run server
+if err := hypermcp.RunWithTransport(ctx, srv, hypermcp.TransportStdio, logger); err != nil {
+    logger.Error("server error", zap.Error(err))
+    os.Exit(1)
+}
+
+// Graceful shutdown with timeout
+shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer shutdownCancel()
+
+if err := srv.Shutdown(shutdownCtx); err != nil {
+    logger.Error("shutdown error", zap.Error(err))
+}
+```
+
+### Cache Usage
+
+Use caching for expensive operations:
+
+```go
+cacheKey := fmt.Sprintf("data:%s", id)
+
+// Check cache first
+if cached, ok := srv.Cache().Get(cacheKey); ok {
+    srv.Metrics().IncrementCacheHits()
+    return cached
+}
+srv.Metrics().IncrementCacheMisses()
+
+// Fetch data...
+result := fetchExpensiveData(id)
+
+// Cache for 5 minutes
+srv.Cache().Set(cacheKey, result, 5*time.Minute)
+```
+
+### HTTP Client Usage
+
+The provided HTTP client includes retries and proper timeouts:
+
+```go
+type Response struct {
+    Status string `json:"status"`
+}
+
+var resp Response
+if err := srv.HTTPClient().Get(ctx, apiURL, &resp); err != nil {
+    srv.Metrics().IncrementErrors()
+    return err
+}
+```
+
+## Examples
 
 ## Dependencies
 
