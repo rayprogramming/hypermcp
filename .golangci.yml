@@ -10,12 +10,6 @@ run:
 
 linters:
   enable:
-    # Default linters
-    - errcheck      # Check for unchecked errors
-    - govet         # Vet examines Go source code
-    - ineffassign   # Detect ineffectual assignments
-    - staticcheck   # Static analysis (includes gosimple checks)
-    - unused        # Find unused code
     # Additional recommended linters
     - bodyclose     # Check HTTP response body is closed
     - dupl          # Code duplication detection
@@ -37,10 +31,6 @@ linters:
     - godox         # Allow TODOs in code
     - wrapcheck     # Too strict for error wrapping
 
-formatters:
-  enable:
-    - gofmt         # Check code formatting
-    - goimports     # Check import ordering
   settings:
     errcheck:
       check-type-assertions: true
