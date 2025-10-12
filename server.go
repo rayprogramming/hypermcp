@@ -52,11 +52,13 @@ type Server struct {
 //
 // Name and Version are required fields and will be validated.
 // CacheEnabled determines whether to initialize a full cache instance.
+// HTTPConfig allows customization of HTTP client behavior (optional, uses defaults if not set).
 type Config struct {
 	Name         string
 	Version      string
 	CacheEnabled bool
 	CacheConfig  cache.Config
+	HTTPConfig   *httpx.Config // Optional: uses defaults if nil
 }
 
 // Validate checks if the configuration is valid.
@@ -84,8 +86,14 @@ func New(cfg Config, logger *zap.Logger) (*Server, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
-	// Create shared HTTP client
-	httpClient := httpx.New(logger)
+	
+	// Create shared HTTP client with optional custom config
+	var httpClient *httpx.Client
+	if cfg.HTTPConfig != nil {
+		httpClient = httpx.NewWithConfig(*cfg.HTTPConfig, logger)
+	} else {
+		httpClient = httpx.New(logger)
+	}
 
 	// Create cache
 	var cacheInstance *cache.Cache
