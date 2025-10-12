@@ -20,6 +20,12 @@ func TestRunWithTransport_Stdio(t *testing.T) {
 		t.Fatalf("failed to create server: %v", err)
 	}
 
+	// Skip actual transport test when running with coverage
+	// because stdio transport captures stdout, breaking coverage output
+	if testing.CoverMode() != "" {
+		t.Skip("Skipping stdio transport test when coverage is enabled")
+	}
+
 	// We can't actually run the server in a test (it would block),
 	// but we can verify the function accepts the correct transport type
 	ctx, cancel := context.WithCancel(context.Background())
