@@ -1,6 +1,8 @@
 # golangci-lint configuration for hypermcp
 # See https://golangci-lint.run/usage/configuration/ for full options
 
+version: "2"
+
 run:
   timeout: 5m
   tests: true
@@ -10,11 +12,9 @@ linters:
   enable:
     # Default linters
     - errcheck      # Check for unchecked errors
-    - gosimple      # Simplify code
     - govet         # Vet examines Go source code
     - ineffassign   # Detect ineffectual assignments
-    - staticcheck   # Static analysis
-    - typecheck     # Type checking
+    - staticcheck   # Static analysis (includes gosimple checks)
     - unused        # Find unused code
     
     # Additional recommended linters
@@ -23,8 +23,6 @@ linters:
     - gocognit      # Cognitive complexity
     - goconst       # Find repeated strings that could be constants
     - gocyclo       # Cyclomatic complexity
-    - gofmt         # Check code formatting
-    - goimports     # Check import ordering
     - gosec         # Security problems
     - misspell      # Spelling mistakes
     - revive        # Golint replacement
@@ -39,6 +37,11 @@ linters:
     - gochecknoinits # Init functions have valid uses
     - godox         # Allow TODOs in code
     - wrapcheck     # Too strict for error wrapping
+
+formatters:
+  enable:
+    - gofmt         # Check code formatting
+    - goimports     # Check import ordering
 
 linters-settings:
   errcheck:
