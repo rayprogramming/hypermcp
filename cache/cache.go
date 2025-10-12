@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ type Cache struct {
 	logger *zap.Logger
 	ttls   map[string]time.Time
 	mu     sync.RWMutex
+	cancel context.CancelFunc
 }
 
 // Config holds cache configuration
@@ -47,14 +49,16 @@ func New(cfg Config, logger *zap.Logger) (*Cache, error) {
 		return nil, err
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
 	c := &Cache{
 		store:  store,
 		logger: logger,
 		ttls:   make(map[string]time.Time),
+		cancel: cancel,
 	}
 
 	// Start background TTL cleanup
-	go c.cleanupExpired()
+	go c.cleanupExpired(ctx)
 
 	return c, nil
 }
@@ -128,33 +132,42 @@ func (c *Cache) Metrics() *ristretto.Metrics {
 }
 
 // cleanupExpired runs a background goroutine to clean up expired entries
-func (c *Cache) cleanupExpired() {
+func (c *Cache) cleanupExpired(ctx context.Context) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		now := time.Now()
-		var expired []string
+	for {
+		select {
+		case <-ctx.Done():
+			c.logger.Debug("cache cleanup stopped")
+			return
+		case <-ticker.C:
+			now := time.Now()
+			var expired []string
 
-		c.mu.RLock()
-		for key, expiry := range c.ttls {
-			if now.After(expiry) {
-				expired = append(expired, key)
+			c.mu.RLock()
+			for key, expiry := range c.ttls {
+				if now.After(expiry) {
+					expired = append(expired, key)
+				}
 			}
-		}
-		c.mu.RUnlock()
+			c.mu.RUnlock()
 
-		for _, key := range expired {
-			c.Delete(key)
-		}
+			for _, key := range expired {
+				c.Delete(key)
+			}
 
-		if len(expired) > 0 {
-			c.logger.Debug("cleaned expired entries", zap.Int("count", len(expired)))
+			if len(expired) > 0 {
+				c.logger.Debug("cleaned expired entries", zap.Int("count", len(expired)))
+			}
 		}
 	}
 }
 
 // Close shuts down the cache
 func (c *Cache) Close() {
+	if c.cancel != nil {
+		c.cancel()
+	}
 	c.store.Close()
 }

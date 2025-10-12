@@ -38,7 +38,7 @@ The example Dockerfile uses **multi-stage builds** for optimal image size and se
 
 ### Stage 1: Builder
 ```dockerfile
-FROM golang:1.21-alpine AS builder
+FROM golang:1.24-alpine AS builder
 ```
 - Uses Alpine Linux for smaller image
 - Installs only build-time dependencies (git, ca-certificates)
@@ -250,7 +250,7 @@ docker-compose up -d --build
 ```dockerfile
 # Production-ready example with all best practices
 
-FROM golang:1.21-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Security: Install only necessary packages
 RUN apk add --no-cache git ca-certificates tzdata
