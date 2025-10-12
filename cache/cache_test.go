@@ -7,6 +7,80 @@ import (
 	"go.uber.org/zap/zaptest"
 )
 
+func TestNew_InvalidConfig(t *testing.T) {
+	logger := zaptest.NewLogger(t)
+
+	tests := []struct {
+		name      string
+		cfg       Config
+		wantError bool
+	}{
+		{
+			name: "valid config",
+			cfg: Config{
+				MaxCost:     1024,
+				NumCounters: 100,
+				BufferItems: 10,
+			},
+			wantError: false,
+		},
+		{
+			name: "zero MaxCost",
+			cfg: Config{
+				MaxCost:     0,
+				NumCounters: 100,
+				BufferItems: 10,
+			},
+			wantError: true,
+		},
+		{
+			name: "negative MaxCost",
+			cfg: Config{
+				MaxCost:     -1,
+				NumCounters: 100,
+				BufferItems: 10,
+			},
+			wantError: true,
+		},
+		{
+			name: "zero NumCounters",
+			cfg: Config{
+				MaxCost:     1024,
+				NumCounters: 0,
+				BufferItems: 10,
+			},
+			wantError: true,
+		},
+		{
+			name: "zero BufferItems",
+			cfg: Config{
+				MaxCost:     1024,
+				NumCounters: 100,
+				BufferItems: 0,
+			},
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := New(tt.cfg, logger)
+			if tt.wantError {
+				if err == nil {
+					t.Error("expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if c != nil {
+					c.Close()
+				}
+			}
+		})
+	}
+}
+
 func TestCache_GetSet(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	c, err := New(DefaultConfig(), logger)
@@ -121,5 +195,75 @@ func BenchmarkCache_Set(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		c.Set("bench-key", "bench-value", 60*time.Second)
+	}
+}
+
+func TestCache_Clear(t *testing.T) {
+	logger := zaptest.NewLogger(t)
+	c, err := New(DefaultConfig(), logger)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
+	defer c.Close()
+
+	// Add multiple values
+	c.Set("key1", "value1", 5*time.Second)
+	c.Set("key2", "value2", 5*time.Second)
+	c.Set("key3", "value3", 5*time.Second)
+
+	time.Sleep(10 * time.Millisecond)
+
+	// Verify they exist
+	if _, found := c.Get("key1"); !found {
+		t.Error("expected key1 to be found before clear")
+	}
+
+	// Clear the cache
+	c.Clear()
+
+	// Verify all keys are gone
+	if _, found := c.Get("key1"); found {
+		t.Error("expected key1 to be cleared")
+	}
+	if _, found := c.Get("key2"); found {
+		t.Error("expected key2 to be cleared")
+	}
+	if _, found := c.Get("key3"); found {
+		t.Error("expected key3 to be cleared")
+	}
+}
+
+func TestCache_Metrics(t *testing.T) {
+	logger := zaptest.NewLogger(t)
+	c, err := New(DefaultConfig(), logger)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
+	defer c.Close()
+
+	// Get metrics
+	metrics := c.Metrics()
+	if metrics == nil {
+		t.Fatal("expected metrics to be non-nil")
+	}
+
+	// Set a value and access it
+	c.Set("metrics-key", "metrics-value", 5*time.Second)
+	time.Sleep(10 * time.Millisecond)
+
+	// Access the key (should be a hit)
+	c.Get("metrics-key")
+
+	// Verify metrics are being tracked
+	if metrics.Hits() == 0 {
+		t.Error("expected at least one cache hit to be recorded")
+	}
+
+	// Access a non-existent key (should be a miss)
+	c.Get("non-existent-key")
+
+	// Verify misses are tracked
+	if metrics.Misses() == 0 {
+		t.Error("expected at least one cache miss to be recorded")
 	}
 }

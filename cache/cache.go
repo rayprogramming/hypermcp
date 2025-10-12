@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -39,6 +40,17 @@ func DefaultConfig() Config {
 
 // New creates a new cache instance
 func New(cfg Config, logger *zap.Logger) (*Cache, error) {
+	// Validate configuration
+	if cfg.MaxCost <= 0 {
+		return nil, fmt.Errorf("MaxCost must be positive, got %d", cfg.MaxCost)
+	}
+	if cfg.NumCounters <= 0 {
+		return nil, fmt.Errorf("NumCounters must be positive, got %d", cfg.NumCounters)
+	}
+	if cfg.BufferItems <= 0 {
+		return nil, fmt.Errorf("BufferItems must be positive, got %d", cfg.BufferItems)
+	}
+
 	store, err := ristretto.NewCache(&ristretto.Config[string, any]{
 		MaxCost:     cfg.MaxCost,
 		NumCounters: cfg.NumCounters,
