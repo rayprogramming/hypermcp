@@ -38,10 +38,10 @@ func main() {
 	hypermcp.AddTool(srv, &mcp.Tool{
 		Name:        "hello",
 		Description: "Say hello to someone",
-		InputSchema: map[string]interface{}{
+		InputSchema: map[string]any{
 			"type": "object",
-			"properties": map[string]interface{}{
-				"name": map[string]interface{}{
+			"properties": map[string]any{
+				"name": map[string]any{
 					"type":        "string",
 					"description": "Name of the person to greet",
 				},
@@ -52,7 +52,7 @@ func main() {
 		Name string `json:"name"`
 	}) (*mcp.CallToolResult, any, error) {
 		greeting := fmt.Sprintf("Hello, %s! 👋", input.Name)
-		
+
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
 				&mcp.TextContent{
