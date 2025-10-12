@@ -55,9 +55,15 @@ jobs:
           args: --timeout=3m
 
       - name: Run tests
+        run: go test -race ./...
+          
+      - name: Generate coverage
         run: |
-          go test -race ./...
-          go test -coverprofile=coverage.out -covermode=atomic ./...
+          echo 'mode: atomic' > coverage.out
+          go test -coverprofile=coverage.tmp -covermode=atomic . && tail -n +2 coverage.tmp >> coverage.out || true
+          go test -coverprofile=coverage.tmp -covermode=atomic ./cache && tail -n +2 coverage.tmp >> coverage.out || true
+          go test -coverprofile=coverage.tmp -covermode=atomic ./httpx && tail -n +2 coverage.tmp >> coverage.out || true
+          rm coverage.tmp
 
       - name: Upload coverage report
         if: always()
