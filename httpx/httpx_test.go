@@ -117,3 +117,59 @@ func BenchmarkClient_DoJSON(b *testing.B) {
 		}
 	}
 }
+
+func TestClient_UserAgent(t *testing.T) {
+	tests := []struct {
+		name            string
+		userAgent       string
+		expectedUA      string
+	}{
+		{
+			name:            "default user agent",
+			userAgent:       "",
+			expectedUA:      "hypermcp",
+		},
+		{
+			name:            "custom user agent",
+			userAgent:       "my-mcp-server/1.0.0",
+			expectedUA:      "my-mcp-server/1.0.0",
+		},
+		{
+			name:            "user agent with version",
+			userAgent:       "hypermcp/0.3.0",
+			expectedUA:      "hypermcp/0.3.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test server that captures User-Agent
+			var capturedUA string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				capturedUA = r.Header.Get("User-Agent")
+				w.Header().Set("Content-Type", "application/json")
+				if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
+			}))
+			defer server.Close()
+
+			logger := zaptest.NewLogger(t)
+			cfg := DefaultConfig()
+			cfg.UserAgent = tt.userAgent
+			client := NewWithConfig(cfg, logger)
+
+			var result map[string]string
+			err := client.Get(context.Background(), server.URL, &result)
+
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+
+			if capturedUA != tt.expectedUA {
+				t.Errorf("expected User-Agent %q, got %q", tt.expectedUA, capturedUA)
+			}
+		})
+	}
+}
+

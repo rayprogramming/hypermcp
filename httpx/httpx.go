@@ -34,6 +34,9 @@ type Config struct {
 	MaxIdleConns        int
 	MaxIdleConnsPerHost int
 	IdleConnTimeout     time.Duration
+
+	// UserAgent to use in HTTP requests (optional, defaults to "hypermcp")
+	UserAgent string
 }
 
 // DefaultConfig returns sensible default configuration for the HTTP client.
@@ -50,6 +53,7 @@ func DefaultConfig() Config {
 		MaxIdleConns:          100,
 		MaxIdleConnsPerHost:   10,
 		IdleConnTimeout:       90 * time.Second,
+		UserAgent:             "hypermcp",
 	}
 }
 
@@ -201,7 +205,12 @@ func (c *Client) Get(ctx context.Context, url string, result interface{}) error 
 		return fmt.Errorf("create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "hypermcp/0.1.0")
+	// Use configured UserAgent or default
+	userAgent := c.config.UserAgent
+	if userAgent == "" {
+		userAgent = "hypermcp"
+	}
+	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/json")
 	// Don't set Accept-Encoding manually - let Go's Transport handle gzip automatically
 	// when DisableCompression is false
