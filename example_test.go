@@ -14,6 +14,7 @@ import (
 // ExampleNew demonstrates basic server creation.
 func ExampleNew() {
 	logger, _ := zap.NewProduction()
+	// Ignore sync errors in examples for simplicity
 	defer func() { _ = logger.Sync() }()
 
 	cfg := hypermcp.Config{
@@ -35,6 +36,7 @@ func ExampleNew() {
 // ExampleServer_Cache demonstrates cache usage.
 func ExampleServer_Cache() {
 	logger, _ := zap.NewDevelopment()
+	// Ignore sync errors in examples for simplicity
 	defer func() { _ = logger.Sync() }()
 
 	cfg := hypermcp.Config{
@@ -69,6 +71,7 @@ func ExampleServer_Cache() {
 // ExampleServer_GetMetrics demonstrates metrics tracking.
 func ExampleServer_GetMetrics() {
 	logger, _ := zap.NewDevelopment()
+	// Ignore sync errors in examples for simplicity
 	defer func() { _ = logger.Sync() }()
 
 	cfg := hypermcp.Config{
@@ -95,6 +98,7 @@ func ExampleServer_GetMetrics() {
 // ExampleAddTool demonstrates tool registration.
 func ExampleAddTool() {
 	logger, _ := zap.NewDevelopment()
+	// Ignore sync errors in examples for simplicity
 	defer func() { _ = logger.Sync() }()
 
 	cfg := hypermcp.Config{
@@ -130,6 +134,7 @@ func ExampleAddTool() {
 // ExampleServer_AddResource demonstrates resource registration.
 func ExampleServer_AddResource() {
 	logger, _ := zap.NewDevelopment()
+	// Ignore sync errors in examples for simplicity
 	defer func() { _ = logger.Sync() }()
 
 	cfg := hypermcp.Config{
