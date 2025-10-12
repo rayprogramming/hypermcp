@@ -95,8 +95,20 @@ func NewWithConfig(cfg Config, logger *zap.Logger) *Client {
 	}
 }
 
-// DoJSON performs an HTTP request and unmarshals the JSON response
-// It includes retry logic with exponential backoff for transient errors
+// DoJSON performs an HTTP request and unmarshals the JSON response.
+// It includes retry logic with exponential backoff for transient errors.
+//
+// The method automatically handles:
+// - Exponential backoff with jitter for retryable errors (429, 5xx)
+// - Request timeouts to prevent hanging
+// - Response size limits to prevent memory exhaustion (10MB default)
+// - Context cancellation for early termination
+//
+// Retryable status codes: 429 (Too Many Requests), 500-504 (Server Errors)
+// Non-retryable errors: 4xx (except 429), JSON decode errors, network errors
+//
+// The request context controls the overall timeout, while individual retry
+// attempts have their own timeouts configured via Config.RequestTimeout.
 func (c *Client) DoJSON(ctx context.Context, req *http.Request, result interface{}) error {
 	reqID := fmt.Sprintf("%p", req)
 	startTime := time.Now()

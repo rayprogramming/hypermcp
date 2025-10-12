@@ -277,16 +277,23 @@ func (s *Server) AddResourceTemplate(template *mcp.ResourceTemplate, handler mcp
 
 // Shutdown performs cleanup and gracefully shuts down the server.
 //
-// This method closes the cache and logs final statistics. It checks if the provided
-// context was canceled during the cleanup process and returns an error if so.
+// This method performs the following cleanup operations in order:
+// 1. Logs final registration statistics (tools and resources)
+// 2. Closes the cache instance (stops background goroutines)
+// 3. Checks for context cancellation or timeout
 //
-// Example:
+// It's safe to call Shutdown multiple times, though subsequent calls
+// will have no effect (except checking context status).
+//
+// Example with timeout:
 //
 //	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 //	defer cancel()
 //	if err := srv.Shutdown(ctx); err != nil {
 //	    log.Printf("shutdown error: %v", err)
 //	}
+//
+// Returns an error if the context was canceled or timed out during cleanup.
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.logger.Info("shutting down server")
 
