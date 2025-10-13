@@ -1,3 +1,20 @@
+# [1.0.0](https://github.com/rayprogramming/hypermcp/compare/v0.3.0...v1.0.0) (2025-10-13)
+
+
+### Bug Fixes
+
+* **ci:** Update go version. Not sure how it got changed back. ([a9b376e](https://github.com/rayprogramming/hypermcp/commit/a9b376e1d08b14504cc1e16125793801aed70cd6))
+
+
+### Features
+
+* improve cache lifecycle and add comprehensive examples ([a9f3bf6](https://github.com/rayprogramming/hypermcp/commit/a9f3bf637c3d0c2c996ff89d9532a24191f16d88))
+
+
+### BREAKING CHANGES
+
+* Cache.cleanupExpired() now requires context.Context parameter (internal API only)
+
 # [0.3.0](https://github.com/rayprogramming/hypermcp/compare/v0.2.0...v0.3.0) (2025-10-12)
 
 
